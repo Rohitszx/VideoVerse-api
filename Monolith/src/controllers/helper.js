@@ -1,7 +1,7 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs').promises;
-
+const Video = require('../models/Video');
 const fileExists = async (filePath) => {
   try {
     await fs.access(filePath);
@@ -14,12 +14,8 @@ const fileExists = async (filePath) => {
 const constructFilePath = (filename) => path.join(__dirname, '../../videos', filename);
 
 const trimVideo = async (videoId, start, end) => {
-  const inputFilePath = constructFilePath(`${videoId}.mp4`);
-  const outputFilePath = constructFilePath(`trimmed_${videoId}.mp4`);
-
-  console.log('Trim video - Input Path:', inputFilePath);
-  console.log('Trim video - Output Path:', outputFilePath);
-
+  const inputFilePath = constructFilePath(`${videoId}`);
+  const outputFilePath = constructFilePath(`trimmed_${videoId}`);
   if (!(await fileExists(inputFilePath))) {
     const errorMsg = `Input file does not exist: ${inputFilePath}`;
     console.error(errorMsg);
@@ -38,15 +34,11 @@ const trimVideo = async (videoId, start, end) => {
         console.error('Error fetching metadata:', err.message);
         return reject(new Error(`Error fetching metadata: ${err.message}`));
       }
-      console.log('Video Metadata:', metadata);
       resolve(metadata);
     });
   });
 
   const duration = metadata.format.duration;
-  console.log('Video Duration:', duration);
-
-  // Ensure the 'end' time is within the video's duration
   if (end > duration) {
     const errorMsg = 'End time exceeds video duration.';
     console.error(errorMsg);
@@ -72,12 +64,11 @@ const trimVideo = async (videoId, start, end) => {
   return { filename: `trimmed_${videoId}.mp4` };
 };
 
-// Merges multiple videos given their IDs
+
 const mergeVideos = async (videoIds) => {
-  const inputFiles = videoIds.map(id => constructFilePath(`${id}.mp4`));
+  const inputFiles = videoIds.map(id => constructFilePath(`${id}`));
   const outputFilePath = constructFilePath(`merged_${Date.now()}.mp4`);
 
-  // Check if all input files exist
   for (const file of inputFiles) {
     if (!(await fileExists(file))) {
       const errorMsg = `File not found: ${file}`;

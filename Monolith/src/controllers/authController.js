@@ -5,7 +5,6 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const generateToken = (user) => {
-  console.log('JWT ',  process.env.JWT_SECRET);
   return jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', { expiresIn: '1h' });
 };
 
@@ -30,7 +29,6 @@ const login = async (req, res) => {
   }
   try {
     const user = await User.findOne({ where: { username: username.toLowerCase() } });
-    console.log('Fetched user from DB:', user);
     if (user && user.password === password) {
       const token = generateToken(user);
       return res.status(200).json({ token });

@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 const Video = require('../models/Video');
 const { trimVideo, mergeVideos } = require('./helper');
+const ffmpeg = require('fluent-ffmpeg');
 
 exports.upload = async (req, res, next) => {
   try {
@@ -14,29 +15,54 @@ exports.upload = async (req, res, next) => {
       return res.status(400).json({ message: 'No video file provided.' });
     }
 
-    const maxSize = 25 * 1024 * 1024; // 25MB
+    const maxSize = 25 * 1024 * 1024; // 25 MB
+    const minDuration = 5; // seconds
+    const maxDuration = 25; // seconds
+
     if (videoFile.size > maxSize) {
       return res.status(400).json({ message: 'Video size exceeds the limit.' });
     }
 
     const uploadDir = path.join(__dirname, '../../videos');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    await fs.promises.mkdir(uploadDir, { recursive: true });
+
+    const uploadPath = path.join(uploadDir, videoFile.name);
+    console.log("uploadPath",uploadPath);
+    
+    const fileExists = await fs.promises.access(uploadPath).then(() => true).catch(() => false);
+    if (fileExists) {
+      return res.status(400).json({ message: 'File already exists with the same name.' });
     }
 
-    const videoRecord = await Video.create({
-      userId: user.id,
-      filename: videoFile.name,
-    });
-    const uploadPath = path.join(uploadDir, `${videoRecord.id}.mp4`);
     await videoFile.mv(uploadPath);
 
-    res.status(201).json({
-      message: 'Video uploaded successfully',
-      videoId: videoRecord.id,
+    ffmpeg.ffprobe(uploadPath, async (err, metadata) => {
+      if (err) {
+        console.error('Error reading video metadata:', err);
+        return res.status(500).json({ message: 'Error processing video file.' });
+      }
+      const duration = metadata.format.duration;
+      if (duration < minDuration || duration > maxDuration) {
+        await fs.promises.unlink(uploadPath);
+        return res.status(400).json({
+          message: `Video duration must be between ${minDuration} and ${maxDuration} seconds.`,
+        });
+      }
+
+      const videoRecord = await Video.create({
+        userId: user.id,
+        filename: videoFile.name,
+        size: videoFile.size,
+        duration: Math.floor(duration),
+      });
+
+      res.status(201).json({
+        message: 'Video uploaded successfully',
+        videoId: videoRecord.id,
+      });
     });
   } catch (error) {
-    next(error); 
+    next(error);
   }
 };
 
@@ -50,10 +76,13 @@ exports.trim = async (req, res, next) => {
       return res.status(404).json({ message: 'Video not found' });
     }
 
-    const trimmedVideo = await trimVideo(videoId, start, end);
+    const trimmedVideo = await trimVideo(videoRecord.filename, start, end); 
+
     const newRecord = await Video.create({
       userId: user.id,
-      filename: trimmedVideo.filename,
+      filename: `trimmed_${videoRecord.filename}`, 
+      size: trimmedVideo.size, 
+      duration: trimmedVideo.duration, 
     });
 
     res.status(200).json({
@@ -75,10 +104,19 @@ exports.merge = async (req, res, next) => {
         message: 'Provide at least two video IDs to merge.',
       });
     }
+    const videoRecords = await Video.findAll({
+      where: {
+        id: videoIds,
+      },
+    });
 
-    const mergedVideo = await mergeVideos(videoIds);
+    if (videoRecords.length !== videoIds.length) {
+      return res.status(404).json({ message: 'One or more videos not found.' });
+    }
+    const videoPaths = videoRecords.map(record => record.filename);
+    const mergedVideo = await mergeVideos(videoPaths);
     const newRecord = await Video.create({
-      userId: user.id,
+      userId: user .id,
       filename: mergedVideo.filename,
     });
 
@@ -143,7 +181,7 @@ exports.accessSharedVideo = async (req, res, next) => {
     if (currentTime > videoRecord.shareExpiry) {
       return res.status(410).json({ message: 'Link has expired' });
     }
-    const videoPath = path.join(__dirname, '../../videos', `${videoRecord.id}.mp4`);
+    const videoPath = path.join(__dirname, '../../videos', `${videoRecord.filename}.mp4`);
 
     res.status(200).json({
       message: 'Access granted',
