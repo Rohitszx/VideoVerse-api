@@ -16,18 +16,22 @@ const constructFilePath = (filename) => path.join(__dirname, '../../videos', fil
 const trimVideo = async (videoId, start, end) => {
   const inputFilePath = constructFilePath(`${videoId}`);
   const outputFilePath = constructFilePath(`trimmed_${videoId}`);
+  
+  // Check if input file exists
   if (!(await fileExists(inputFilePath))) {
     const errorMsg = `Input file does not exist: ${inputFilePath}`;
     console.error(errorMsg);
     throw new Error(errorMsg);
   }
 
+  // Validate start and end times
   if (start < 0 || end <= start) {
     const errorMsg = 'Invalid start or end time for video trimming.';
     console.error(errorMsg);
     throw new Error(errorMsg);
   }
 
+  // Fetch metadata for input file
   const metadata = await new Promise((resolve, reject) => {
     ffmpeg.ffprobe(inputFilePath, (err, metadata) => {
       if (err) {
@@ -45,6 +49,7 @@ const trimVideo = async (videoId, start, end) => {
     throw new Error(errorMsg);
   }
 
+  // Trim video
   await new Promise((resolve, reject) => {
     ffmpeg(inputFilePath)
       .setStartTime(start)
@@ -61,7 +66,25 @@ const trimVideo = async (videoId, start, end) => {
       .run();
   });
 
-  return { filename: `trimmed_${videoId}.mp4` };
+  // Fetch metadata for the trimmed output file
+  const trimmedMetadata = await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(outputFilePath, (err, metadata) => {
+      if (err) {
+        console.error('Error fetching metadata for trimmed video:', err.message);
+        return reject(new Error(`Error fetching metadata for trimmed video: ${err.message}`));
+      }
+      resolve(metadata);
+    });
+  });
+
+  const trimmedDuration = trimmedMetadata.format.duration;
+  const trimmedSize = trimmedMetadata.format.size;
+
+  return { 
+    filename: `trimmed_${videoId}.mp4`,
+    duration: trimmedDuration,
+    size: trimmedSize
+  };
 };
 
 
@@ -69,6 +92,7 @@ const mergeVideos = async (videoIds) => {
   const inputFiles = videoIds.map(id => constructFilePath(`${id}`));
   const outputFilePath = constructFilePath(`merged_${Date.now()}.mp4`);
 
+  // Ensure all input files exist
   for (const file of inputFiles) {
     if (!(await fileExists(file))) {
       const errorMsg = `File not found: ${file}`;
@@ -77,7 +101,8 @@ const mergeVideos = async (videoIds) => {
     }
   }
 
-  return new Promise((resolve, reject) => {
+  // Merging videos using ffmpeg
+  await new Promise((resolve, reject) => {
     const command = ffmpeg();
 
     inputFiles.forEach(file => {
@@ -87,7 +112,7 @@ const mergeVideos = async (videoIds) => {
     command
       .on('end', () => {
         console.log(`Videos merged successfully: ${outputFilePath}`);
-        resolve({ filename: path.basename(outputFilePath) });
+        resolve();
       })
       .on('error', (err) => {
         console.error('FFmpeg Error during merging:', err.message);
@@ -95,6 +120,27 @@ const mergeVideos = async (videoIds) => {
       })
       .mergeToFile(outputFilePath);
   });
+
+  // Fetching metadata of the merged video
+  const metadata = await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(outputFilePath, (err, metadata) => {
+      if (err) {
+        console.error('Error fetching metadata for merged video:', err.message);
+        return reject(new Error(`Error fetching metadata for merged video: ${err.message}`));
+      }
+      resolve(metadata);
+    });
+  });
+
+  const mergedDuration = metadata.format.duration;
+  const mergedSize = metadata.format.size;
+
+  return { 
+    filename: `merged_${Date.now()}.mp4`,
+    duration: mergedDuration,
+    size: mergedSize
+  };
 };
+
 
 module.exports = { trimVideo, mergeVideos };

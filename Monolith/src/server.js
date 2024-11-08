@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const Routes = require('./routes/routes');
 const Video = require('./models/Video');
 const User = require('./models/User');
+const ShareLink = require('./models/ShareLink');
 const dotenv = require('dotenv');
 dotenv.config(); 
 
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, async () => {
   await Video.sync();
-  await User.sync({ alter: true });  
+  await User.sync({ alter: true }); 
+  await ShareLink.sync({ alter: true }); 
   console.log(`Video service running on port ${PORT}`);
 });

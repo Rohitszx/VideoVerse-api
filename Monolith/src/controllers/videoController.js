@@ -2,7 +2,10 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
+const User = require('../models/User');
 const Video = require('../models/Video');
+const ShareLink  = require('../models/ShareLink');
+
 const { trimVideo, mergeVideos } = require('./helper');
 const ffmpeg = require('fluent-ffmpeg');
 
@@ -99,25 +102,36 @@ exports.merge = async (req, res, next) => {
     const { user } = req;
     const { videoIds } = req.body;
 
+    // Ensure valid input
     if (!Array.isArray(videoIds) || videoIds.length < 2) {
       return res.status(400).json({
         message: 'Provide at least two video IDs to merge.',
       });
     }
+
+    // Fetch video records from the database
     const videoRecords = await Video.findAll({
       where: {
         id: videoIds,
       },
     });
 
+    // Check if all video records are found
     if (videoRecords.length !== videoIds.length) {
       return res.status(404).json({ message: 'One or more videos not found.' });
     }
+
     const videoPaths = videoRecords.map(record => record.filename);
+
+    // Merge videos
     const mergedVideo = await mergeVideos(videoPaths);
+
+    // Create new video record for the merged video
     const newRecord = await Video.create({
-      userId: user .id,
+      userId: user.id,
       filename: mergedVideo.filename,
+      size: mergedVideo.size,
+      duration: mergedVideo.duration
     });
 
     res.status(200).json({
@@ -142,7 +156,6 @@ exports.generateShareLink = async (req, res, next) => {
   try {
     const { videoId } = req.body;
     const { user } = req;
-
     const videoRecord = await Video.findByPk(videoId);
     if (!videoRecord) {
       return res.status(404).json({ message: 'Video not found' });
@@ -153,15 +166,21 @@ exports.generateShareLink = async (req, res, next) => {
     }
 
     const shareToken = uuidv4();
-    videoRecord.shareToken = shareToken;
-    videoRecord.shareExpiry = moment().add(24, 'hours').toDate();
-    await videoRecord.save();
+    const expiry = moment().add(24, 'hours').toDate();
 
-    const shareLink = `${req.protocol}://${req.get('host')}/api/videoverse/share/${shareToken}`;
+    const shareLink = await ShareLink.create({
+      shareToken,
+      expiry,
+      videoId: videoRecord.id,
+      userId: user.id,
+    });
+
+    const shareUrl = `${req.protocol}://${req.get('host')}/api/videoverse/share/${shareToken}`;
+
     res.status(200).json({
       message: 'Share link generated successfully',
-      shareLink,
-      expiresAt: videoRecord.shareExpiry,
+      shareLink: shareUrl,
+      expiresAt: shareLink.expiry,
     });
   } catch (error) {
     next(error);
@@ -171,24 +190,32 @@ exports.generateShareLink = async (req, res, next) => {
 exports.accessSharedVideo = async (req, res, next) => {
   try {
     const { shareToken } = req.params;
-    const videoRecord = await Video.findOne({ where: { shareToken } });
+    const shareLink = await ShareLink.findOne({
+      where: { shareToken },
+    });
 
-    if (!videoRecord) {
+    if (!shareLink) {
       return res.status(404).json({ message: 'Invalid or expired link' });
     }
-
     const currentTime = new Date();
-    if (currentTime > videoRecord.shareExpiry) {
+    if (currentTime > shareLink.expiry) {
       return res.status(410).json({ message: 'Link has expired' });
     }
-    const videoPath = path.join(__dirname, '../../videos', `${videoRecord.filename}.mp4`);
+    const video = await Video.findOne({
+      where: { id: shareLink.videoId },
+    });
+
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    const videoPath = path.join(__dirname, '../../videos', `${video.filename}`);
 
     res.status(200).json({
       message: 'Access granted',
       video: {
-        id: videoRecord.id,
-        filename: videoRecord.filename,
-        sharedByUserId: videoRecord.userId,
+        id: video.id,
+        filename: video.filename,
+        sharedByUserId: video.user ? video.user.id : null, 
         videoUrl: videoPath,
       },
     });

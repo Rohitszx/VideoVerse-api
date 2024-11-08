@@ -1,22 +1,22 @@
 const { Sequelize, DataTypes } = require('sequelize');
-const sequelize = new Sequelize('sqlite::memory:'); 
+const sequelize = new Sequelize('sqlite::memory:');
 
 const Video = sequelize.define('Video', {
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
   filename: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  shareToken: {
-    type: DataTypes.STRING,
-    allowNull: true, 
+  size: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
   },
-  shareExpiry: {
-    type: DataTypes.DATE,
-    allowNull: true, 
+  duration: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull : false
   },
 });
 
