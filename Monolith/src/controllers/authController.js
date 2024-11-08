@@ -4,10 +4,12 @@ const User = require('../models/User');
 const dotenv = require('dotenv');
 dotenv.config();
 
+// Generate JWT token
 const generateToken = (user) => {
-  return jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', { expiresIn: '1h' });
+  return jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1h' });
 };
 
+// User signup handler
 const signup = async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -15,13 +17,14 @@ const signup = async (req, res) => {
   }
   try {
     const user = await User.create({ username: username.toLowerCase(), password });
-    const token = generateToken(user);
-    res.status(201).json({ token });
+    const token = generateToken(user); 
+    res.status(201).json({ token }); 
   } catch (error) {
     res.status(500).json({ message: 'Error signing up user', error: error.message });
   }
 };
 
+// User login handler
 const login = async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -38,6 +41,5 @@ const login = async (req, res) => {
     res.status(500).json({ message: 'Error logging in user', error: error.message });
   }
 };
-
 
 module.exports = { signup, login };
