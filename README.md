@@ -24,10 +24,12 @@ Make sure you have the following installed:
 
 1. Clone the repository to your local machine:
    **git clone <repository-url>**
-   **cd <project-directory>**
+   **cd <project-directory>/Monolith/**
 2. Install dependencies using npm:
       **npm install**
 3. Set up a .env file to store sensitive information like the database URL, JWT secret, etc.
+
+4. **npm start**
 
 ## Setting Up FFmpeg
 FFmpeg is a powerful multimedia framework used for video processing. This project uses FFmpeg for tasks like video trimming, merging, and more. Follow these steps to ensure FFmpeg is installed correctly:
