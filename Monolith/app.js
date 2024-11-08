@@ -1,15 +1,16 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const videoRoutes = require('./routes/videoRoutes');
+const videoRoutes = require('./routes/routes');
 const Video = require('./models/Video');
-
+const User = require('./models/User');
 const app = express();
 app.use(bodyParser.json());
-app.use('/videos', videoRoutes);
+app.use('/api/videos', videoRoutes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4004;
 
 app.listen(PORT, async () => {
   await Video.sync(); 
+  await User.sync();
   console.log(`Video service running on port ${PORT}`);
 });

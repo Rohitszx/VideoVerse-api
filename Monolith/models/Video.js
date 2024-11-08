@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const sequelize = new Sequelize('sqlite::memory:'); 
 
-const Video = sequelize.define('Video', {
+const Video = sequelize.define('video', {
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,

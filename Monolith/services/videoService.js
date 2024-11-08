@@ -1,33 +1,61 @@
 const fs = require('fs');
 const path = require('path');
-const { Video } = require('../models/videoModel');
+const { Video } = require('../models/Video');
 const videoHelper = require('../helpers/videoHelper');
 
-const validateVideo = (videoFile, res) => {
-  if (videoFile.size > config.VIDEO_MAX_SIZE * 1024 * 1024) {
-    return res.status(400).json({ message: `Video exceeds the ${config.VIDEO_MAX_SIZE}MB size limit.` });
-  }
-  return videoHelper.getVideoDuration(videoFile.path).then((duration) => {
-    if (duration < config.VIDEO_MIN_DURATION || duration > config.VIDEO_MAX_DURATION) {
-      return res.status(400).json({ message: `Video duration must be between ${config.VIDEO_MIN_DURATION} and ${config.VIDEO_MAX_DURATION} seconds.` });
+const uploadVideo = async (req, res, next) => {
+    try {
+      const { user } = req;
+      const videoFile = req.files?.video;
+  
+      if (!videoFile) {
+        return res.status(400).json({ message: 'No video file provided.' });
+      }
+      const maxSize = 25 * 1024 * 1024; // 25MB
+      if (videoFile.size > maxSize) {
+        return res.status(400).json({ message: 'Video size exceeds the limit.' });
+      }
+  
+      const uploadDir = path.join(__dirname, '../uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+  
+      const videoRecord = await Video.create({
+        userId: user.id,
+        filename: videoFile.name,
+      });
+      const uploadPath = path.join(uploadDir, `${videoRecord.id}.mp4`);
+      await videoFile.mv(uploadPath);
+  
+      res.status(201).json({
+        message: 'Video uploaded successfully',
+        videoId: videoRecord.id,
+      });
+    } catch (error) {
+      next(error); 
     }
-    return duration;
-  });
 };
 
-const uploadVideo = async (file) => {
-  const uploadPath = path.join(__dirname, '..', 'uploads', file.filename);
-  
-  await validateVideo(file, uploadPath);
-  
-  const video = await Video.create({ 
-    filename: file.filename, 
-    path: uploadPath,
-    duration: await videoHelper.getVideoDuration(uploadPath),
-  });
-
-  return video;
+const trimVideo = async (req, res, next) => {
+    try {
+        const { user } = req;
+        const { videoId, start, end } = req.body;
+        const videoRecord = await Video.findByPk(videoId);
+        if (!videoRecord) {
+            return res.status(404).json({ message: 'Video not found' });
+        }
+        const trimmedVideo = await videoHelper.trimVideo(videoId, start, end);
+        const newRecord = await Video.create({
+            userId: user.id,
+            filename: trimmedVideo.filename,
+        });
+        res.status(200).json({
+            message: 'Video trimmed successfully',
+            video: newRecord,
+        });
+    } catch (error) {
+        next(error);
+    }
 };
-
-
-module.exports = { uploadVideo, trimVideo, mergeVideos, generateShareLink };
+module.exports = { uploadVideo, trimVideo};
