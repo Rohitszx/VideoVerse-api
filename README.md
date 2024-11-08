@@ -22,9 +22,9 @@ Make sure you have the following installed:
 
 ## Installation
 
-1. Clone the repository to your local machine:
-   **git clone <repository-url>**
-   **cd <project-directory>/Monolith/**
+1. Clone the repository to your local machine: \
+   **git clone <repository-url>** <br />
+   **cd <project-directory>/Monolith/**<br />
 2. Install dependencies using npm:
       **npm install**
 3. Set up a .env file to store sensitive information like the database URL, JWT secret, etc.
