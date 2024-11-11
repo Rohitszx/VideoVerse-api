@@ -94,7 +94,7 @@ describe('Complete Auth and Video Upload Flow', () => {
     it('should deny access to the upload route without a token', async () => {
       const response = await request(app)
         .post('/upload')
-        .attach('video', 'C:/Users/rs200/Downloads/3764259-hd_1280_720_60fps.mp4');  
+        .attach('video', Buffer.from('fake video content'), 'testVideo.mp4');  
 
       console.log('No Token Response:', response.body);
       expect(response.status).toBe(401);
@@ -105,7 +105,7 @@ describe('Complete Auth and Video Upload Flow', () => {
       const response = await request(app)
         .post('/upload')
         .set('Authorization', 'Bearer invalidToken') 
-        .attach('video', 'C:/Users/rs200/Downloads/3764259-hd_1280_720_60fps.mp4');  
+        .attach('video', Buffer.from('fake video content'), 'testVideo.mp4');  
 
       console.log('Invalid Token Response:', response.body);
       expect(response.status).toBe(401);  
@@ -116,7 +116,7 @@ describe('Complete Auth and Video Upload Flow', () => {
       const response = await request(app)
         .post('/upload')
         .set('Authorization', `Bearer ${token}`)
-        .attach('video', 'C:/Users/rs200/Downloads/3764259-hd_1280_720_60fps.mp4'); 
+        .attach('video', Buffer.from('fake video content'), 'testVideo.mp4'); 
 
       console.log('Valid Token Upload Response:', response.body);
       expect(response.status).toBe(200);
